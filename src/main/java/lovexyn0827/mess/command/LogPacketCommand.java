@@ -50,7 +50,7 @@ public class LogPacketCommand {
 	}
 
 	public static boolean isSubscribed(Packet<?> packet) {
-		return SUBSCRIBED_TYPES.contains(packet.getPacketId().id());
+		return SUBSCRIBED_TYPES.contains(packet.getPacketType().id());
 	}
 	
 	public static void reset() {

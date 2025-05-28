@@ -11,12 +11,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtDouble;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtFloat;
-import net.minecraft.nbt.NbtHelper;
-import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.*;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
@@ -36,8 +31,10 @@ public class EntityDataDumpHelper {
 					.asMutableText()
 					.styled((s) -> {
 						String cmd = asCommand(e, holding.hasEnchantments());
-						return s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(cmd)))
-								.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, cmd));
+						return s.withHoverEvent(new HoverEvent.ShowText(Text.literal(cmd)))
+								.withClickEvent(new ClickEvent.CopyToClipboard(cmd));
+//						return s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(cmd)))
+//								.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, cmd));
 					});
 			player.sendMessage(copyCmd, false);
 		}
@@ -100,8 +97,26 @@ public class EntityDataDumpHelper {
 
 	private static void removeUuid(NbtCompound tag) {
 		tag.remove("UUID");
-		for(NbtElement passenger : tag.getList("Passengers", 10)) {
-			removeUuid((NbtCompound) passenger);
+
+		// 从 NbtCompound 中获取 "Passengers" 列表
+		// NbtCompound.getListOrEmpty(String key) 返回 NbtList，如果不存在则为空列表
+		NbtList passengers = tag.getListOrEmpty("Passengers");
+
+		if (!passengers.isEmpty()) {
+			// 迭代列表中的每个 NbtElement
+			for (NbtElement passengerElement : passengers) {
+				// 检查每个元素是否为 NbtCompound 类型
+				if (passengerElement instanceof NbtCompound passengerCompound) {
+					// 如果是，则递归调用 removeUuid
+					removeUuid(passengerCompound);
+				} else {
+					// 如果乘客列表中的元素不是 NbtCompound，这可能是一个数据错误或预期之外的情况
+					// 可以选择记录一个警告
+					System.err.println("Warning: Element in 'Passengers' list is not an NbtCompound. Actual type: "
+							+ NbtTypes.byId(passengerElement.getType()).getCommandFeedbackName()
+							+ ", Value: " + passengerElement.toString());
+				}
+			}
 		}
 	}
 }

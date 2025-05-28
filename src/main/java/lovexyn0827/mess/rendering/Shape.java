@@ -5,12 +5,14 @@ import com.google.common.collect.HashBiMap;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.joml.Matrix4f;
 
 public abstract class Shape {
 	protected static final BiMap<String, Class<? extends Shape>> IDS = HashBiMap.create();
@@ -27,7 +29,7 @@ public abstract class Shape {
 	private long createdTime;
 	double renderEpsilon = 0;
 	private int fill;
-	
+
 	protected Shape(int color, int fill, int life, long gt) {
 		this.color = color;
 		this.fill = fill;
@@ -44,12 +46,21 @@ public abstract class Shape {
 	}
 
 	@Environment(EnvType.CLIENT)
-	protected abstract void renderFaces(MatrixStack matrices, Tessellator tessellator, double cameraX,
-			double cameraY, double cameraZ, float partialTick);
-
+	protected abstract void renderFacesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+												double cameraY, double cameraZ, float partialTick);
 	@Environment(EnvType.CLIENT)
-	protected abstract void renderLines(MatrixStack matrices, Tessellator tessellator, double cameraX,
-			double cameraY, double cameraZ, float partialTick);
+	protected abstract void renderLinesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+												double cameraY, double cameraZ, float partialTick);
+
+
+
+//	@Environment(EnvType.CLIENT)
+//	protected abstract void renderFaces(MatrixStack matrices, Tessellator tessellator, double cameraX,
+//			double cameraY, double cameraZ, float partialTick);
+//
+//	@Environment(EnvType.CLIENT)
+//	protected abstract void renderLines(MatrixStack matrices, Tessellator tessellator, double cameraX,
+//			double cameraY, double cameraZ, float partialTick);
 
 	protected abstract boolean shouldRender(RegistryKey<World> dimensionType);
 
@@ -66,25 +77,51 @@ public abstract class Shape {
 		return tag;
 	}
 
+	// Shape.java - fromTag 方法 (假设标准 NbtCompound，并且接受键不存在时返回0的行为)
 	public static Shape fromTag(NbtCompound tag) {
-		switch(tag.get("ID").asString()) {
-		case "box" : 
-			return new RenderedBox(tag.getDouble("X0"), tag.getDouble("Y0"), tag.getDouble("Z0"), 
-					tag.getDouble("X1"), tag.getDouble("Y1"), tag.getDouble("Z1"), 
-					tag.getInt("Color"), tag.getInt("Fill"), tag.getInt("Life"), tag.getLong("GT"));
-		case "line" : 
-			return new RenderedLine(new Vec3d(tag.getDouble("X0"), tag.getDouble("Y0"), tag.getDouble("Z0")), 
-					new Vec3d(tag.getDouble("X1"), tag.getDouble("Y1"), tag.getDouble("Z1")), 
-					tag.getInt("Color"), tag.getInt("Life"), tag.getLong("GT"));
-		case "text" : 
-			return new RenderedText(tag.getString("Value"), 
-					new Vec3d(tag.getDouble("X"), tag.getDouble("Y"), tag.getDouble("Z")), 
-							tag.getInt("Color"), tag.getInt("Life"), tag.getLong("GT"));
-		}
-		
-		return null;
+		// getString(key, fallback) 是一个好方法，如果键不存在或不是字符串，它会返回fallback
+		// 或者我们可以用 getString(key).orElse("")
+		String id = tag.getString("ID", ""); // 如果 "ID" 不存在或不是字符串，返回空字符串
+
+		// 使用 getTYPE(key, fallbackValue) 更简洁且安全
+		// 或者使用 getTYPE(key).orElse(fallbackValue)
+
+        return switch (id) {
+            case "box" -> new RenderedBox(
+                    tag.getDouble("X0", 0.0), // 如果X0不存在或不是double，则为0.0
+                    tag.getDouble("Y0", 0.0),
+                    tag.getDouble("Z0", 0.0),
+                    tag.getDouble("X1", 0.0),
+                    tag.getDouble("Y1", 0.0),
+                    tag.getDouble("Z1", 0.0),
+                    tag.getInt("Color", 0xFFFFFFFF), // 默认白色不透明
+                    tag.getInt("Fill", 0x00000000),   // 默认完全透明填充
+                    tag.getInt("Life", 0),          // 默认生命值为0 (可能代表永生或需要特殊处理)
+                    tag.getLong("GT", 0L)
+            );
+            case "line" -> new RenderedLine(
+                    new Vec3d(tag.getDouble("X0", 0.0), tag.getDouble("Y0", 0.0), tag.getDouble("Z0", 0.0)),
+                    new Vec3d(tag.getDouble("X1", 0.0), tag.getDouble("Y1", 0.0), tag.getDouble("Z1", 0.0)),
+                    tag.getInt("Color", 0xFFFFFFFF),
+                    tag.getInt("Life", 0),
+                    tag.getLong("GT", 0L)
+            );
+            case "text" -> new RenderedText(
+                    tag.getString("Value", ""), // 如果Value不存在或不是字符串，则为空字符串
+                    new Vec3d(tag.getDouble("X", 0.0), tag.getDouble("Y", 0.0), tag.getDouble("Z", 0.0)),
+                    tag.getInt("Color", 0xFFFFFFFF),
+                    tag.getInt("Life", 0),
+                    tag.getLong("GT", 0L)
+            );
+            default -> {
+                if (!id.isEmpty()) { // 只在 ID 不是我们期望的空字符串时打印错误
+                    System.err.println("Unknown shape ID from NBT: " + id);
+                }
+                yield null;
+            }
+        };
 	}
-	
+
 	static {
 		IDS.put("box", RenderedBox.class);
 		IDS.put("line", RenderedLine.class);

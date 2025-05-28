@@ -62,7 +62,8 @@ public final class PulseRecorder {
 					this.start.gameTime, this.start.phase == null ? "?" : this.start.phase.name(), 
 					this.end.gameTime, this.end.phase == null ? "?" : this.end.phase.name(), 
 					pos.getX(), pos.getY(), pos.getZ());
-			HoverEvent he = new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(details));
+//			HoverEvent he = new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(details));
+			HoverEvent he = new HoverEvent.ShowText(Text.literal(details));
 			text.formatted(Formatting.BOLD, positive ? Formatting.RED : Formatting.BLUE);
 			text.append(Text.literal(Long.toString(this.length)).formatted(Formatting.RESET).fillStyle(Style
 					.EMPTY.withHoverEvent(he)));

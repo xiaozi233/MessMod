@@ -382,7 +382,7 @@ public class OptionManager{
 	@Option(defaultValue = "[]", 
 			parserClass = ListParser.Ticket.class, 
 			label = { Label.CHUNK, Label.RESEARCH })
-	public static List<ChunkTicketType<?>> rejectChunkTicket;
+	public static List<ChunkTicketType> rejectChunkTicket;
 	
 	@Option(defaultValue = "false", 
 			parserClass = BooleanParser.class, 

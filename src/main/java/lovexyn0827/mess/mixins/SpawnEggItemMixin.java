@@ -1,5 +1,6 @@
 package lovexyn0827.mess.mixins;
 
+import net.minecraft.registry.RegistryWrapper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,23 +24,20 @@ import net.minecraft.world.World;
 
 @Mixin(value = SpawnEggItem.class, priority = 1001)
 public abstract class SpawnEggItemMixin {
-	@Shadow
-	protected abstract EntityType<?> getEntityType(ItemStack stack);
-	
-	@Inject(method = "use(Lnet/minecraft/world/World;Lnet/minecraft/entity/player/PlayerEntity;"
-					+ "Lnet/minecraft/util/Hand;)Lnet/minecraft/util/TypedActionResult;", 
+	@Shadow public abstract EntityType<?> getEntityType(RegistryWrapper.WrapperLookup registries, ItemStack stack);
+
+	@Inject(method = "use",
 			at = @At(value = "HEAD"), 
 			cancellable = true
 	)
 	public void mountIfNeeded(World world, PlayerEntity user, Hand hand, 
 			CallbackInfoReturnable<ActionResult> cir) {
-		if(OptionManager.quickMobMounting && user instanceof ServerPlayerEntity && user.isSneaking()) {
-			ServerPlayerEntity splayer = (ServerPlayerEntity) user;
-			ItemStack stack = user.getStackInHand(hand);
+		if(OptionManager.quickMobMounting && user instanceof ServerPlayerEntity splayer && user.isSneaking()) {
+            ItemStack stack = user.getStackInHand(hand);
 			Entity vehicle = RaycastUtil.getTargetEntity(splayer);
 			if(vehicle != null) {
 				BlockPos pos = vehicle.getBlockPos();
-				Entity entity = this.getEntityType(stack)
+				Entity entity = this.getEntityType(world.getRegistryManager(), stack)
 						.spawnFromItemStack((ServerWorld)world, stack, user, pos, 
 								SpawnReason.SPAWN_ITEM_USE, false, false);
 				entity.startRiding(vehicle, true);

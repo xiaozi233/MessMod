@@ -28,6 +28,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.explosion.ExplosionImpl;
 
+//TODO: 怎么一堆报错？
 @Mixin(ExplosionImpl.class)
 public abstract class ExplosionMixin {
 	@ModifyArg(method = "affectWorld",

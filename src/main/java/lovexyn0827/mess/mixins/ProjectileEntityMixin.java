@@ -1,6 +1,10 @@
 package lovexyn0827.mess.mixins;
 
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,33 +23,43 @@ import net.minecraft.world.World;
 
 @Mixin(ProjectileEntity.class)
 public abstract class ProjectileEntityMixin extends Entity {
-	private static final ChunkTicketType<? super Entity> ENTITY_TICKET = ChunkTicketType.create("projectile", (a, b) -> 1, 3);
-	private static final ChunkTicketType<? super Entity> PERMANENT_ENTITY_TICKET = ChunkTicketType.create("projectile_permanent", (a, b) -> 1);
+//	private static final ChunkTicketType<? super Entity> ENTITY_TICKET = ChunkTicketType.create("projectile", (a, b) -> 1, 3);
+//	private static final ChunkTicketType<? super Entity> PERMANENT_ENTITY_TICKET = ChunkTicketType.create("projectile_permanent", (a, b) -> 1);
+@Unique
+private static final ChunkTicketType ENTITY_TICKET = Registry.register(
+		Registries.TICKET_TYPE,
+		Identifier.of("messmod", "projectile"),
+		new ChunkTicketType(3L,false, ChunkTicketType.Use.LOADING_AND_SIMULATION)
+	);
+
+	@Unique
+	private static final ChunkTicketType PERMANENT_ENTITY_TICKET = Registry.register(
+			Registries.TICKET_TYPE,
+			Identifier.of("messmod", "projectile_permanent"),
+			new ChunkTicketType(0L, true, ChunkTicketType.Use.LOADING_AND_SIMULATION)
+	);
 	private ProjectileEntityMixin(EntityType<?> type, World world) {
 		super(type, world);
 	}
 
-	@SuppressWarnings("resource")
-	@Inject(method = "tick",
-			at = @At("TAIL")
-			)
+	@Inject(method = "tick", at = @At("TAIL"))
 	private void loadChunkIfNeeded(CallbackInfo ci) {
 		if(!this.getWorld().isClient) {
 			// Firework rockets are not supported because their movements are hard to predict.
 			if(OptionManager.projectileChunkLoading && !((Object)this instanceof FireworkRocketEntity)) {
 				ServerWorld world = (ServerWorld)this.getWorld();
 				Vec3d nextPos = this.getPos().add(this.getVelocity());
-				ChunkTicketType<? super Entity> tt = OptionManager.projectileChunkLoadingPermanence ? PERMANENT_ENTITY_TICKET : ENTITY_TICKET;
-				world.getServer().submitAndJoin(() -> 
-					world.getChunkManager().addTicket(tt, new ChunkPos((int)(nextPos.x / 16), 
-							(int)(nextPos.z / 16)), OptionManager.projectileChunkLoadingRange, this));
+				ChunkTicketType tt = OptionManager.projectileChunkLoadingPermanence ? PERMANENT_ENTITY_TICKET : ENTITY_TICKET;
+				world.getServer().submitAndJoin(() ->
+					world.getChunkManager().addTicket(tt, new ChunkPos((int)(nextPos.x / 16),
+							(int)(nextPos.z / 16)), OptionManager.projectileChunkLoadingRange));
 			}
 		}
 	}
 	
-	@ModifyVariable(method = "setVelocity", 
-			at = @At("HEAD"), 
-			ordinal = 1)
+	@ModifyVariable(method = "setVelocity*",
+			at = @At("HEAD"),
+			ordinal = 1, argsOnly = true)
 	private float tryRemoveRandomness(float dIn) {
 		return OptionManager.disableProjectileRandomness ? 0.0F : dIn * OptionManager.projectileRandomnessScale;
 	}

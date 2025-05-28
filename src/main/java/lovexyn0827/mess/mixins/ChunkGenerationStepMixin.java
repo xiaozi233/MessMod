@@ -2,6 +2,7 @@ package lovexyn0827.mess.mixins;
 
 import java.util.concurrent.CompletableFuture;
 
+import net.minecraft.block.Block;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -36,7 +37,7 @@ public abstract class ChunkGenerationStepMixin {
 		ChunkStatus s = ((ChunkGenerationStep)(Object) this).targetStatus();
 		if(OptionManager.skippedGenerationStages.contains(new RangeParser.ChunkStatusRange.ChunkStatusSorter(s, s.getIndex()))) {
 			if (chunk instanceof ProtoChunk protoChunk && protoChunk.getStatus().isEarlierThan(s)) {
-				((ProtoChunk)chunk).setStatus(s);
+				protoChunk.setStatus(s);
 			}
 			
 			cir.setReturnValue(CompletableFuture.completedFuture(chunk));
@@ -44,7 +45,7 @@ public abstract class ChunkGenerationStepMixin {
 		}
 	}
 	
-	@Inject(method = "run", at = @At(value = "RETURN"), cancellable = true)
+	@Inject(method = "run", at = @At(value = "RETURN"))
 	private void generateChunkGrid(ChunkGenerationContext context, 
 			BoundedRegionArray<AbstractChunkHolder> boundedRegionArray, Chunk chunk, 
 			CallbackInfoReturnable<CompletableFuture<Chunk>> cir) {
@@ -58,12 +59,12 @@ public abstract class ChunkGenerationStepMixin {
 			int endZ = start.getZ() + 15;
 			BlockPos.Mutable pos = new BlockPos.Mutable();
 			Heightmap heights = chunk.getHeightmap(Heightmap.Type.OCEAN_FLOOR_WG);
-			BlockState block = ((chunkPos.x & 1) != (chunkPos.z &1)) ? 
+			BlockState block = ((chunkPos.x & 1) != (chunkPos.z &1)) ?
 					Blocks.PURPLE_STAINED_GLASS.getDefaultState() : Blocks.LIME_STAINED_GLASS.getDefaultState();
 			for(int x = start.getX(); x <= endX; x++) {
 				for(int z = start.getZ(); z <= endZ; z++) {
 					pos.set(x, heights.get(x & 0xF, z & 0xF) - 1, z);
-					chunk.setBlockState(pos, block, false);
+					chunk.setBlockState(pos, block, Block.FORCE_STATE);
 				}
 			}
 		}

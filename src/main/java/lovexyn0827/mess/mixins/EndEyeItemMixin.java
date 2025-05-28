@@ -43,8 +43,8 @@ public class EndEyeItemMixin {
 						sp));
 				if(hit.getType() != HitResult.Type.MISS) {
 					Vec3d pos = hit.getPos();
-					sp.getServerWorld().getChunkManager().addTicket(ChunkTicketType.POST_TELEPORT, 
-							sp.getChunkPos(), 1, sp.getId());
+					sp.getServerWorld().getChunkManager().addTicket(ChunkTicketType.UNKNOWN,
+							sp.getChunkPos(), 1);
 					sp.networkHandler.requestTeleport(pos.x, pos.y, pos.z, sp.getYaw(), sp.getPitch());
 				}
 			}

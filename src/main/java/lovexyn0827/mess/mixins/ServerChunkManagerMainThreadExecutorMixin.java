@@ -9,6 +9,7 @@ import java.util.function.BooleanSupplier;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -21,12 +22,15 @@ import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.thread.ThreadExecutor;
 
-@Mixin(ServerChunkManager.MainThreadExecutor.class)
+@Mixin(targets = "net.minecraft.server.world.ServerChunkManager$MainThreadExecutor")
 public abstract class ServerChunkManagerMainThreadExecutorMixin extends ThreadExecutor<Runnable> {
 	@Shadow()
-	private @Final ServerChunkManager field_18810;
+    @Final
+    ServerChunkManager field_18810;
 	
+	@Unique
 	private static final AtomicLong NEXT_ID = new AtomicLong(0);
+	@Unique
 	private static final Map<Object, Long> TASK_TO_ID = Collections.synchronizedMap(new WeakHashMap<>());
 	
 	protected ServerChunkManagerMainThreadExecutorMixin(String name) {

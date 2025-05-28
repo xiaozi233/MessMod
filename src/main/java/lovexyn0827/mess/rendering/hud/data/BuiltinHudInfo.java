@@ -3,10 +3,10 @@ package lovexyn0827.mess.rendering.hud.data;
 import java.util.Map;
 import java.util.function.Function;
 
+import lovexyn0827.mess.fakes.AbstractBoatEntityInterface;
 import org.jetbrains.annotations.Nullable;
 
 import com.google.common.collect.Maps;
-import lovexyn0827.mess.mixins.BoatEntityAccessor;
 import lovexyn0827.mess.rendering.hud.EntityHudUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -26,12 +26,12 @@ public enum BuiltinHudInfo implements HudLine {
 	MOTION_X("Motion X", DataType.DOUBLE, (e) -> e.getVelocity().x),
 	MOTION_Y("Motion Y", DataType.DOUBLE, (e) -> e.getVelocity().y),
 	MOTION_Z("Motion Z", DataType.DOUBLE, (e) -> e.getVelocity().z),
-	DELTA_X("Delta X", DataType.DOUBLE, (e) -> e.getX() - e.prevX),
-	DELTA_Y("Delta Y", DataType.DOUBLE, (e) -> e.getY() - e.prevY),
-	DELTA_Z("Delta Z", DataType.DOUBLE, (e) -> e.getZ() - e.prevZ),
-	YAW("Yaw", DataType.FLOAT, (e) -> e.getYaw()),
-	PITCH("Pitch", DataType.FLOAT, (e) -> e.getPitch()),
-	FALL_DISTANCE("Fall Distance", DataType.FLOAT, (e) -> e.fallDistance),
+	DELTA_X("Delta X", DataType.DOUBLE, (e) -> e.getX() - e.lastX),
+	DELTA_Y("Delta Y", DataType.DOUBLE, (e) -> e.getY() - e.lastY),
+	DELTA_Z("Delta Z", DataType.DOUBLE, (e) -> e.getZ() - e.lastZ),
+	YAW("Yaw", DataType.FLOAT, Entity::getYaw),
+	PITCH("Pitch", DataType.FLOAT, Entity::getPitch),
+	FALL_DISTANCE("Fall Distance", DataType.DOUBLE, (e) -> e.fallDistance),
 	GENERAL_FLAGS("State", DataType.STRING, EntityHudUtil::getGeneralFlags),
 	FORWARD("Forward", DataType.FLOAT, (e) -> ((LivingEntity) e).forwardSpeed, LivingEntity.class),
 	SIDEWAYS("SideWays", DataType.FLOAT, (e) -> ((LivingEntity) e).sidewaysSpeed, LivingEntity.class),
@@ -42,7 +42,7 @@ public enum BuiltinHudInfo implements HudLine {
 	//XXX FLYING_SPEED("Fly Speed", DataType.FLOAT, (e) -> ((LivingEntity) e).airStrafingSpeed, LivingEntity.class),
 	FUSE("Fuse", DataType.INTEGER, (e) -> ((TntEntity) e).getFuse(), TntEntity.class),
 	POWER_X("Power", DataType.DOUBLE, (e) -> ((ExplosiveProjectileEntity) e).accelerationPower, ExplosiveProjectileEntity.class),
-	VELOCITY_DECAY("Decay", DataType.FLOAT, (e) -> ((BoatEntityAccessor) e).getVelocityDeacyMCWMEM(), BoatEntity.class),
+	VELOCITY_DECAY("Decay", DataType.FLOAT, (e) -> ((AbstractBoatEntityInterface) e).getVelocityDeacyMCWMEM(), BoatEntity.class),
 	POSE("Pose", DataType.POSE, Entity::getPose);
 	
 	public static final Map<String, BuiltinHudInfo> BY_TITLE = Maps.newHashMap();

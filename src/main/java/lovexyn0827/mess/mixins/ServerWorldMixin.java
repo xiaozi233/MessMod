@@ -137,13 +137,12 @@ public abstract class ServerWorldMixin implements BlockView, ServerWorldInterfac
 	}
 	
 	@Inject(
-			method = "method_31420", 
+			method = "method_31420",
 			at = @At(
-					value = "INVOKE", 
-					target = "net/minecraft/server/world/ChunkTicketManager.shouldTickEntities(J)Z"
-			), 
-			cancellable = true, 
-			locals = LocalCapture.CAPTURE_FAILHARD
+					value = "INVOKE",
+					target = "Lnet/minecraft/server/world/ChunkLevelManager;shouldTickEntities(J)Z"
+			),
+			cancellable = true
 	)
 	public void skipTickingEntityIfNeeded(TickManager tickManager, Profiler profiler, 
 			Entity entity, CallbackInfo ci) {

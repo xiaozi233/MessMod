@@ -115,8 +115,8 @@ public class MessCfgCommand {
 									if(opt.globalOnly()) {
 										MutableText errMsg = Text.literal(I18N.translate("cmd.messcfg.globalonly", name))
 												.fillStyle(Style.EMPTY
-														.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, 
-																"/messcfg setGlobal " + name + ' ' + value)));
+														.withClickEvent(new ClickEvent.SuggestCommand("/messcfg setGlobal " + name + ' ' + value)));
+//
 										ct.getSource().sendError(errMsg);
 										return -1;
 									}
@@ -159,11 +159,13 @@ public class MessCfgCommand {
 	
 	private static void dumpOption(ServerCommandSource source, String name, OptionWrapper opt) {
 		String v = OptionManager.getActiveOptionSet().getSerialized(name);
-		ClickEvent event = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/messcfg " + name);
+//		ClickEvent event = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/messcfg " + name);
+		ClickEvent event = new ClickEvent.SuggestCommand("/messcfg " + name);
 		MutableText text = Text.literal(name + ": " + v)
 				.fillStyle(Style.EMPTY.withClickEvent(event)
-						.withHoverEvent((new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
-								Text.literal(opt.getDescription())))))
+						.withHoverEvent((new HoverEvent.ShowText(Text.literal(opt.getDescription())))))
+				// new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+				//								Text.literal(opt.getDescription()))
 				.formatted(Formatting.GRAY);
 		boolean modified = !v.equals(opt.getDefaultValue());
 		source.sendFeedback(() -> {

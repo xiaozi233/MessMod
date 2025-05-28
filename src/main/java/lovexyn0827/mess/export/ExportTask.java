@@ -21,13 +21,21 @@ import java.util.function.LongPredicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import lovexyn0827.mess.mixins.*;
+import net.minecraft.command.DataCommandStorage;
+import net.minecraft.nbt.*;
+import net.minecraft.registry.RegistryOps;
+import net.minecraft.scoreboard.ServerScoreboard;
+import net.minecraft.server.world.ChunkTicket;
+import net.minecraft.server.world.ChunkTicketManager;
+import net.minecraft.world.*;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 
 import lovexyn0827.mess.MessMod;
-import lovexyn0827.mess.mixins.DataCommandStorageAccessor;
-import lovexyn0827.mess.mixins.MinecraftServerAccessor;
-import lovexyn0827.mess.mixins.RaidManagerAccessor;
-import lovexyn0827.mess.mixins.WorldSavePathMixin;
 import lovexyn0827.mess.options.OptionManager;
 import lovexyn0827.mess.rendering.RenderedBox;
 import net.minecraft.SharedConstants;
@@ -35,10 +43,6 @@ import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.component.type.MapIdComponent;
 import net.minecraft.item.map.MapState;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.registry.Registries;
 import net.minecraft.resource.DataConfiguration;
@@ -52,15 +56,12 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.village.raid.Raid;
 import net.minecraft.village.raid.RaidManager;
-import net.minecraft.world.ForcedChunkState;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.IdCountsState;
-import net.minecraft.world.PersistentStateManager;
-import net.minecraft.world.World;
+import org.slf4j.Logger;
 
 public final class ExportTask {
 	private static final WorldSavePath EXPORT_PATH = WorldSavePathMixin.create("exported_saves");
 	private static final Map<CommandOutput, ExportTask> TASKS = new HashMap<>();
+	private static final Logger LOGGER = LogUtils.getLogger();
 	private final Map<String, Region> regions = new HashMap<>();
 	private final MinecraftServer server;
 	private final EnumSet<SaveComponent> components = EnumSet.noneOf(SaveComponent.class);
@@ -127,9 +128,11 @@ public final class ExportTask {
 			if(!dir.resolve("data").toFile().exists()) {
 				Files.createDirectories(dir.resolve("data"));
 			}
-			
+
+			PersistentState.Context context = new PersistentState.Context(world);
+
 			PersistentStateManager psm = 
-					new PersistentStateManager(dir.resolve("data"), this.server.getDataFixer(), 
+					new PersistentStateManager(context, dir.resolve("data"), this.server.getDataFixer(),
 							this.server.getRegistryManager());
 			if(this.components.contains(SaveComponent.RAID)) {
 				exportRaids(world, psm);
@@ -140,14 +143,14 @@ public final class ExportTask {
 			if(world.getRegistryKey() == World.OVERWORLD) {
 				if(this.components.contains(SaveComponent.SCOREBOARD)) {
 					ScoreboardState ss = new ScoreboardState(world.getScoreboard());
-					psm.set("scoreboard", ss);
+					psm.set(ServerScoreboard.STATE_TYPE, ss);
 				}
 				
 				if(this.components.contains(SaveComponent.DATA_COMMAND_STORAGE)) {
 					((DataCommandStorageAccessor) this.server.getDataCommandStorage()).getStorages()
 							.forEach((id, cds) -> {
 								cds.markDirty();
-								psm.set(id, cds);
+								psm.set(DataCommandStorage.PersistentState.createStateType(id), cds);
 							});
 				}
 			}
@@ -217,14 +220,33 @@ public final class ExportTask {
 	private void tryExportForceChunks(ServerWorld world, PersistentStateManager psm) {
 		boolean copyLocal = this.components.contains(SaveComponent.FORCE_CHUNKS_LOCAL);
 		boolean copyOther = this.components.contains(SaveComponent.FORCE_CHUNKS_OTHER);
-		ForcedChunkState fcs = ForcedChunkState.fromNbt(world.getPersistentStateManager()
-				.getOrCreate(ForcedChunkState.getPersistentStateType(), "chunks")
-				.writeNbt(new NbtCompound(), world.getRegistryManager()), world.getRegistryManager());
-		fcs.markDirty();
-		fcs.getChunks().removeIf((LongPredicate) (pos) -> {
-			boolean local = this.regions.values().stream().anyMatch((r) -> r.contains(world, pos));
-			return !(local && copyLocal || !local && copyOther);
-		});
+		ChunkTicketManager ticketManager = ((ServerChunkManagerAccessor) world.getChunkManager()).getTicketManager();
+
+		LongSet forcedChunks = ticketManager.getForcedChunks();
+
+		// 过滤符合条件的区块
+		LongIterator iterator = forcedChunks.iterator();
+		while (iterator.hasNext()) {
+			long chunkPosLong = iterator.nextLong();
+			boolean local = this.regions.values().stream().anyMatch(r -> r.contains(world, chunkPosLong));
+
+			if (!(local && copyLocal || !local && copyOther)) {
+				// 移除不符合条件的强制加载
+				ticketManager.setChunkForced(new ChunkPos(chunkPosLong), false);
+			}
+		}
+
+		// 持久化修改到目标管理器（示例）
+		psm.set(ChunkTicketManager.STATE_TYPE, ticketManager);
+
+//		ForcedChunkState fcs = ForcedChunkState.fromNbt(world.getPersistentStateManager()
+//				.getOrCreate(ForcedChunkState.getPersistentStateType(), "chunks")
+//				.writeNbt(new NbtCompound(), world.getRegistryManager()), world.getRegistryManager());
+//		fcs.markDirty();
+//		fcs.getChunks().removeIf((LongPredicate) (pos) -> {
+//			boolean local = this.regions.values().stream().anyMatch((r) -> r.contains(world, pos));
+//			return !(local && copyLocal || !local && copyOther);
+//		});
 	}
 
 	private void tryExportMaps(ServerWorld world, PersistentStateManager psm) {
@@ -238,20 +260,38 @@ public final class ExportTask {
 			if(origin == null) {
 				return;
 			}
-			
-            MapState ms = MapState.fromNbt(origin.writeNbt(new NbtCompound(), reg), reg);
-			ms.markDirty();
-			if(ms != null) {
-				boolean local = this.regions.values().stream().anyMatch((r) -> r.contains(ms));
-				if(local && copyLocal || !local && copyOther) {
-					psm.set(id.asString(), ms);
+			RegistryOps<NbtElement> registryOps = reg.getOps(NbtOps.INSTANCE);
+			NbtCompound nbt = (NbtCompound) MapState.CODEC
+					.encodeStart(registryOps, origin)
+					.getOrThrow();
+
+			// 解析回 MapState（仅为演示 Codec 使用，实际可能不需要）
+			MapState ms = MapState.CODEC
+					.parse(registryOps, nbt)
+					.resultOrPartial(error -> LOGGER.error("MapState parsing failed: {}", error))
+					.orElse(null);
+
+			if (ms != null) {
+				ms.markDirty();
+				boolean local = this.regions.values().stream().anyMatch(r -> r.contains(ms));
+				if ((local && copyLocal) || (!local && copyOther)) {
+					// 使用 PersistentStateType 替代字符串 ID
+					psm.set(MapState.createStateType(id), ms);
 				}
 			}
+//            MapState ms = MapState.fromNbt(origin.writeNbt(new NbtCompound(), reg), reg);
+//			ms.markDirty();
+//			if(ms != null) {
+//				boolean local = this.regions.values().stream().anyMatch((r) -> r.contains(ms));
+//				if(local && copyLocal || !local && copyOther) {
+//					psm.set(id.asString(), ms);
+//				}
+//			}
 		}
 		
 		if((copyLocal || copyOther) && world.getRegistryKey() == World.OVERWORLD) {
-			psm.set("idcounts", world.getPersistentStateManager()
-			        .getOrCreate(IdCountsState.getPersistentStateType(), "idcounts"));
+			IdCountsState state = world.getPersistentStateManager().getOrCreate(IdCountsState.STATE_TYPE);
+			psm.set(IdCountsState.STATE_TYPE, state);
 		}
 	}
 
@@ -301,16 +341,16 @@ public final class ExportTask {
 	private void createLevelDat(String name, WorldGenType wgType, Path temp) throws IOException {
 	    NbtCompound level = NbtIo.readCompressed(
 				this.server.getSavePath(WorldSavePathMixin.create("level.dat")), NbtSizeTracker.ofUnlimitedBytes());
-		level.getCompound("Data").putString("LevelName", name);
+		level.getCompoundOrEmpty("Data").putString("LevelName", name);
 		if(!this.components.contains(SaveComponent.GAMERULES)) {
 			GameRules rules = new GameRules(DataConfiguration.SAFE_MODE.enabledFeatures());
-			level.getCompound("Data").put("GameRules", rules.toNbt());
+			level.getCompoundOrEmpty("Data").put("GameRules", rules.toNbt());
 		}
 		
-		NbtCompound wgConfig = level.getCompound("Data")
-				.getCompound("WorldGenSettings")
-				.getCompound("dimensions")
-				.getCompound("minecraft:overworld");
+		NbtCompound wgConfig = level.getCompoundOrEmpty("Data")
+				.getCompoundOrEmpty("WorldGenSettings")
+				.getCompoundOrEmpty("dimensions")
+				.getCompoundOrEmpty("minecraft:overworld");
 		switch (wgType) {
 		case BEDROCK:
 			wgConfig.put("generator", createFlatWorld(Blocks.BEDROCK));
@@ -332,20 +372,37 @@ public final class ExportTask {
 	}
 
 	private void exportRaids(ServerWorld world, PersistentStateManager psm) throws IOException {
-	    String id = RaidManager.nameFor(world.getDimensionEntry());
+		// 修改后的代码
+		String id = RaidManager.getPersistentStateType(world.getDimensionEntry()).id();
 		RaidManager ps = world.getPersistentStateManager()
-				.get(RaidManager.getPersistentStateType(world), id);
-		DynamicRegistryManager reg = world.getRegistryManager();
-		RaidManager tempRm = RaidManager.fromNbt(world, ps.writeNbt(new NbtCompound(), reg));
-		Iterator<Map.Entry<Integer, Raid>> itr = ((RaidManagerAccessor) tempRm).getRaids().entrySet().iterator();
-		while(itr.hasNext()) {
-			Map.Entry<Integer, Raid> entry = itr.next();
-			if(!this.regions.values().stream().anyMatch((r) -> r.contains(world, entry.getValue().getCenter()))) {
-				itr.remove();
-			}
-		}
-		
-		psm.set(id, tempRm);
+				.get(RaidManager.getPersistentStateType(world.getDimensionEntry()));
+
+		// 使用新的CODEC序列化方式
+		NbtCompound nbt = (NbtCompound) RaidManager.CODEC.encodeStart(NbtOps.INSTANCE, ps).getOrThrow();
+		RaidManager tempRm = RaidManager.CODEC.parse(NbtOps.INSTANCE, nbt).resultOrPartial().orElseGet(RaidManager::new);
+
+		// 使用FastUtil的Int2ObjectMap迭代方式
+        ((RaidManagerAccessor) tempRm).getRaids().int2ObjectEntrySet()
+				.removeIf(entry -> this.regions.values().stream().noneMatch(
+						(r) -> r.contains(world, entry.getValue().getCenter())
+				));
+
+		// 使用新的持久化状态API保存
+		psm.set(RaidManager.getPersistentStateType(world.getDimensionEntry()), tempRm);
+//	    String id = RaidManager.nameFor(world.getDimensionEntry());
+//		RaidManager ps = world.getPersistentStateManager()
+//				.get(RaidManager.getPersistentStateType(world), id);
+//		DynamicRegistryManager reg = world.getRegistryManager();
+//		RaidManager tempRm = RaidManager.fromNbt(world, ps.writeNbt(new NbtCompound(), reg));
+//		Iterator<Map.Entry<Integer, Raid>> itr = ((RaidManagerAccessor) tempRm).getRaids().entrySet().iterator();
+//		while(itr.hasNext()) {
+//			Map.Entry<Integer, Raid> entry = itr.next();
+//			if(!this.regions.values().stream().anyMatch((r) -> r.contains(world, entry.getValue().getCenter()))) {
+//				itr.remove();
+//			}
+//		}
+//
+//		psm.set(id, tempRm);
 	}
 
 	private static NbtCompound createFlatWorld(Block block) {

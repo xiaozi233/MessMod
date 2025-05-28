@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import net.minecraft.server.world.*;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,16 +17,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.mojang.datafixers.DataFixer;
 import lovexyn0827.mess.MessMod;
-import lovexyn0827.mess.fakes.ChunkTicketManagerInterface;
+import lovexyn0827.mess.fakes.ChunkLevelManagerInterface;
 import lovexyn0827.mess.log.chunk.ChunkBehaviorLogger;
 import lovexyn0827.mess.log.chunk.ChunkEvent;
 import lovexyn0827.mess.util.blame.StackTrace;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.WorldGenerationProgressListener;
-import net.minecraft.server.world.ChunkHolder;
-import net.minecraft.server.world.OptionalChunk;
-import net.minecraft.server.world.ServerChunkLoadingManager;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.thread.ThreadExecutor;
@@ -37,193 +34,194 @@ import net.minecraft.world.chunk.ChunkStatusChangeListener;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.level.storage.LevelStorage;
 
+//TODO: 既然原来也没加到json里边就先不做
 @Mixin(ServerChunkLoadingManager.class)
 public abstract class ThreadedAnvilChunkStorageMixin {	
 	@Shadow @Final
-	private ServerWorld world;
-	
+    ServerWorld world;
+
 	@Shadow @Final
-	private ServerChunkLoadingManager.TicketManager ticketManager;
-	
-	@Inject(method = "loadChunk", 
+	private ChunkTicketManager ticketManager;
+
+	@Inject(method = "loadChunk",
 			at = @At(value = "HEAD")
 	)
-	private void onSchedulingChunkLoad(ChunkPos pos, 
+	private void onSchedulingChunkLoad(ChunkPos pos,
 			CallbackInfoReturnable<CompletableFuture<Chunk>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_LOADING, pos.toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_LOADING, pos.toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
 
-	@Inject(method = "tryUnloadChunk", 
+	@Inject(method = "tryUnloadChunk",
 			at = @At(value = "HEAD")
 	)
 	private void onSchedulingChunkUnload(long pos, ChunkHolder chunkHolder, CallbackInfo ci) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_UNLOADING, pos, 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_UNLOADING, pos,
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "convertToFullChunk", 
+
+	@Inject(method = "convertToFullChunk",
 			at = @At(value = "HEAD")
 	)
-	private void onSchedulingChunkGeneration(ChunkHolder chunkHolder, Chunk chunk, 
+	private void onSchedulingChunkGeneration(ChunkHolder chunkHolder, Chunk chunk,
 			CallbackInfoReturnable<CompletableFuture<CompletableFuture<Chunk>>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_GENERATION, chunkHolder.getPos().toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_GENERATION, chunkHolder.getPos().toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "generate", 
-			at = @At(value = "HEAD")
-	)
-	private void onSchedulingChunkUdgrade(ChunkHolder holder, ChunkStatus requiredStatus, 
-			CallbackInfoReturnable<CompletableFuture<CompletableFuture<Chunk>>> cir) {
-		if(ChunkBehaviorLogger.shouldSkip()) {
-			return;
-		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_UPGRADE, holder.getPos().toLong(), 
-				this.world.getRegistryKey().getValue(), Thread.currentThread(), 
-				StackTrace.blameCurrent(), Registries.CHUNK_STATUS.getId(requiredStatus));
-	}
-	
-	@Inject(method = "method_43375", 
-			at = @At(value = "HEAD"), 
+
+//	@Inject(method = "generate",
+//			at = @At(value = "HEAD")
+//	)
+//	private void onSchedulingChunkUdgrade(ChunkHolder holder, ChunkStatus requiredStatus,
+//			CallbackInfoReturnable<CompletableFuture<CompletableFuture<Chunk>>> cir) {
+//		if(ChunkBehaviorLogger.shouldSkip()) {
+//			return;
+//		}
+//
+//		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.SCHEDULER_UPGRADE, holder.getPos().toLong(),
+//				this.world.getRegistryKey().getValue(), Thread.currentThread(),
+//				StackTrace.blameCurrent(), Registries.CHUNK_STATUS.getId(requiredStatus));
+//	}
+
+	@Inject(method = "method_43375",
+			at = @At(value = "HEAD"),
 			remap = false
 	)
-	private void onChunkLoad(ChunkPos pos, Optional<?> nbt, 
+	private void onChunkLoad(ChunkPos pos, Optional<?> nbt,
 			CallbackInfoReturnable<CompletableFuture<Chunk>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.LOADING, pos.toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.LOADING, pos.toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "save(Lnet/minecraft/world/chunk/Chunk;)Z", 
+
+	@Inject(method = "save(Lnet/minecraft/world/chunk/Chunk;)Z",
 			at = @At(value = "HEAD")
 	)
 	private void onChunkUnload(Chunk chunk, CallbackInfoReturnable<Boolean> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.UNLOADING, chunk.getPos().toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.UNLOADING, chunk.getPos().toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "method_17227", 
-			at = @At(value = "HEAD"), 
+
+	@Inject(method = "method_17227",
+			at = @At(value = "HEAD"),
 			remap = false
 	)
-	private void onChunkGeneration(ChunkHolder holder, Chunk chunk, 
+	private void onChunkGeneration(ChunkHolder holder, Chunk chunk,
 			CallbackInfoReturnable<CompletableFuture<CompletableFuture<Chunk>>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.GENERATION, holder.getPos().toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.GENERATION, holder.getPos().toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "method_17224", 
-			at = @At(value = "HEAD"), 
+
+	@Inject(method = "method_17224",
+			at = @At(value = "HEAD"),
 			remap = false
 	)
-	private void onChunkUpgrade(ChunkPos pos, ChunkHolder holder, ChunkStatus status, Executor e, 
+	private void onChunkUpgrade(ChunkPos pos, ChunkHolder holder, ChunkStatus status, Executor e,
 			OptionalChunk<?> mayChunk, CallbackInfoReturnable<Boolean> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.UPGRADE, holder.getPos().toLong(), 
-				this.world.getRegistryKey().getValue(), Thread.currentThread(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.UPGRADE, holder.getPos().toLong(),
+				this.world.getRegistryKey().getValue(), Thread.currentThread(),
 				StackTrace.blameCurrent(), Registries.CHUNK_STATUS.getId(status));
 	}
-	
-	@Inject(method = "method_43375", 
-			at = @At(value = "RETURN"), 
+
+	@Inject(method = "method_43375",
+			at = @At(value = "RETURN"),
 			remap = false
 	)
-	private void onChunkLoadFinish(ChunkPos pos, Optional<?> nbt, 
+	private void onChunkLoadFinish(ChunkPos pos, Optional<?> nbt,
 			CallbackInfoReturnable<CompletableFuture<Chunk>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_LOADING, pos.toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_LOADING, pos.toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "save(Lnet/minecraft/world/chunk/Chunk;)Z", 
+
+	@Inject(method = "save(Lnet/minecraft/world/chunk/Chunk;)Z",
 			at = @At(value = "RETURN")
 	)
 	private void onChunkUnloadFinish(Chunk chunk, CallbackInfoReturnable<Boolean> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_UNLOADING, chunk.getPos().toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_UNLOADING, chunk.getPos().toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "method_17227", 
-			at = @At(value = "RETURN"), 
+
+	@Inject(method = "method_17227",
+			at = @At(value = "RETURN"),
 			remap = false
 	)
-	private void onChunkGenerationFinish(ChunkHolder holder, Chunk chunk, 
+	private void onChunkGenerationFinish(ChunkHolder holder, Chunk chunk,
 			CallbackInfoReturnable<CompletableFuture<CompletableFuture<Chunk>>> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_GENERATION, holder.getPos().toLong(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_GENERATION, holder.getPos().toLong(),
 				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), null);
 	}
-	
-	@Inject(method = "method_17224", 
-			at = @At(value = "RETURN"), 
+
+	@Inject(method = "method_17224",
+			at = @At(value = "RETURN"),
 			remap = false
 	)
-	private void onChunkUpgradeFinish(ChunkPos pos, ChunkHolder holder, ChunkStatus status, Executor exec, 
+	private void onChunkUpgradeFinish(ChunkPos pos, ChunkHolder holder, ChunkStatus status, Executor exec,
 			OptionalChunk<?> mayChunk, CallbackInfoReturnable<Boolean> cir) {
 		if(ChunkBehaviorLogger.shouldSkip()) {
 			return;
 		}
-		
-		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_UPGRADE, holder.getPos().toLong(), 
-				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(), 
+
+		MessMod.INSTANCE.getChunkLogger().onEvent(ChunkEvent.END_UPGRADE, holder.getPos().toLong(),
+				this.world.getRegistryKey().getValue(), Thread.currentThread(), StackTrace.blameCurrent(),
 				Registries.CHUNK_STATUS.getId(status));
 	}
-	
-	@Inject(
-			method = "<init>", 
-			at = @At(
-					value = "FIELD", 
-					target = "net/minecraft/server/world/ThreadedAnvilChunkStorage."
-							+ "ticketManager:Lnet/minecraft/server/world/ThreadedAnvilChunkStorage$TicketManager;", 
-					opcode = Opcodes.PUTFIELD, 
-					shift = At.Shift.AFTER
-			)
-	)
-	private void onCreatedTicketManager(ServerWorld world, LevelStorage.Session session, DataFixer dataFixer, 
-			StructureTemplateManager structureTemplateManager, Executor executor, 
-			ThreadExecutor<Runnable> mainThreadExecutor, ChunkProvider chunkProvider, ChunkGenerator chunkGenerator, 
-			WorldGenerationProgressListener worldGenerationProgressListener, 
-			ChunkStatusChangeListener chunkStatusChangeListener, 
-			Supplier<PersistentStateManager> persistentStateManagerFactory, int viewDistance, boolean dsync, 
-			CallbackInfo ci) {
-		((ChunkTicketManagerInterface) this.ticketManager).initWorld(world);
-	}
+
+//	@Inject(
+//			method = "<init>",
+//			at = @At(
+//					value = "FIELD",
+//					target = "net/minecraft/server/world/ThreadedAnvilChunkStorage."
+//							+ "ticketManager:Lnet/minecraft/server/world/ThreadedAnvilChunkStorage$TicketManager;",
+//					opcode = Opcodes.PUTFIELD,
+//					shift = At.Shift.AFTER
+//			)
+//	)
+//	private void onCreatedTicketManager(ServerWorld world, LevelStorage.Session session, DataFixer dataFixer,
+//			StructureTemplateManager structureTemplateManager, Executor executor,
+//			ThreadExecutor<Runnable> mainThreadExecutor, ChunkProvider chunkProvider, ChunkGenerator chunkGenerator,
+//			WorldGenerationProgressListener worldGenerationProgressListener,
+//			ChunkStatusChangeListener chunkStatusChangeListener,
+//			Supplier<PersistentStateManager> persistentStateManagerFactory, int viewDistance, boolean dsync,
+//			CallbackInfo ci) {
+//		((ChunkLevelManagerInterface) this.ticketManager).initWorld(world);
+//	}
 }

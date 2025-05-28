@@ -157,7 +157,9 @@ public class ExportSaveCommand {
 		Text link = new FormattedText("cmd.exportsave.saveto", "n", true, out.getFileName())
 				.asMutableText()
 				.styled((s) -> s.withClickEvent(
-						new ClickEvent(ClickEvent.Action.OPEN_FILE, out.toAbsolutePath().toString())));
+						// 使用 ClickEvent.OpenFile 记录，并传递路径字符串
+						new ClickEvent.OpenFile(out.toAbsolutePath().toString())
+				));
 		ct.getSource().sendFeedback(() -> link, false);
 		return Command.SINGLE_SUCCESS;
 	}

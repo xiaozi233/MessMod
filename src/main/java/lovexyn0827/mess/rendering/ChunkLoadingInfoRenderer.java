@@ -58,10 +58,10 @@ public class ChunkLoadingInfoRenderer {
 						
 						int color;
 						long posL = pos.toLong();
-						if(scm.chunkLoadingManager.getTicketManager().shouldTickEntities(posL)) {
+						if((scm.chunkLoadingManager).getLevelManager().shouldTickEntities(posL)) {
 							// Entity processing
 							color = 0xFF0000BF;
-						} else if(scm.chunkLoadingManager.getTicketManager().shouldTickBlocks(posL)){
+						} else if(scm.chunkLoadingManager.getLevelManager().shouldTickBlocks(posL)){
 							// Lazy loaded
 							color = 0x00FF00BF;
 						} else {

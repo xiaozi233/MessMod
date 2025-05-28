@@ -128,7 +128,7 @@ public class CommandUtil {
 	public static void error(CommandContext<ServerCommandSource> ct, String string, Exception e) {
 		String details = e.toString() + '\n' + e.getStackTrace()[0];
 		ct.getSource().sendError(Text.literal(I18N.translate(string) + ": " + I18N.translate(e.getMessage()))
-				.styled((s) -> s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(details)))));
+				.styled((s) -> s.withHoverEvent(new HoverEvent.ShowText(Text.literal(details)))));
 		if(OptionManager.superSuperSecretSetting) {
 			e.printStackTrace();
 			Thread.dumpStack();
@@ -138,7 +138,7 @@ public class CommandUtil {
 	public static void errorRaw(CommandContext<ServerCommandSource> ct, String str, @NotNull Exception e) {
 		String details = e.toString() + '\n' + e.getStackTrace()[0];
 		ct.getSource().sendError(Text.literal(str == null ? "[null]" : str)
-				.styled((s) -> s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(details)))));
+				.styled((s) -> s.withHoverEvent(new HoverEvent.ShowText(Text.literal(details)))));
 		if(OptionManager.superSuperSecretSetting) {
 			e.printStackTrace();
 			Thread.dumpStack();

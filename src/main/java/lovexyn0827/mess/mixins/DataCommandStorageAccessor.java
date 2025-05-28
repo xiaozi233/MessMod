@@ -6,10 +6,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.command.DataCommandStorage;
-import net.minecraft.world.PersistentState;
 
 @Mixin(DataCommandStorage.class)
 public interface DataCommandStorageAccessor {
 	@Accessor("storages")
-	Map<String, PersistentState> getStorages();
+	Map<String, DataCommandStorage.PersistentState> getStorages();
 }
