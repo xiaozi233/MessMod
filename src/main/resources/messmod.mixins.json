@@ -31,7 +31,6 @@
     "EntityPredicatesMixin",
     "EntitySelectorOptionsMixin",
     "EntitySelectorReaderMixin",
-    "ExplosionMixin",
     "FillCommandMixin",
     "FletchingTableBlockMixin",
     "FormattingAccessor",

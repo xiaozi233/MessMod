@@ -16,7 +16,7 @@ import lovexyn0827.mess.util.blame.StackTrace;
 
 @Mixin(targets = "net.minecraft.server.world.ChunkLevelManager$NearbyChunkTicketUpdater")
 public class ChunkLevelManagerNearbyChunkTicketUpdaterMixin {
-	@Shadow @Final ChunkLevelManager field_17463;
+	@Shadow(remap = false) @Final ChunkLevelManager field_17463;
 	
 	@Inject(method = "updateTicket", at = @At("HEAD"))
 	private void updateTicket(long pos, int distance, 
