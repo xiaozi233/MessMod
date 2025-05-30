@@ -1,5 +1,6 @@
 package lovexyn0827.mess.mixins;
 
+import lovexyn0827.mess.MessMod;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
@@ -23,26 +24,7 @@ import net.minecraft.world.World;
 public abstract class TntEntityMixin extends Entity{
 //	private static final ChunkTicketType<? super Entity> ENTITY_TICKET = ChunkTicketType.create("tnt", (a, b) -> 1, 3);
 //	private static final ChunkTicketType<? super Entity> PERMANENT_ENTITY_TICKET = ChunkTicketType.create("tnt_permanent", (a, b) -> 1);
-	@Unique
-	private static final ChunkTicketType ENTITY_TICKET = Registry.register(
-		Registries.TICKET_TYPE,
-		Identifier.of("messmod", "tnt"),
-		new ChunkTicketType(
-				3L,  // 3 ticks后过期
-				false, // 不持久化
-				ChunkTicketType.Use.LOADING_AND_SIMULATION
-		)
-	);
-	@Unique
-	private static final ChunkTicketType PERMANENT_ENTITY_TICKET = Registry.register(
-			Registries.TICKET_TYPE,
-			Identifier.of("messmod", "tnt_permanent"),
-			new ChunkTicketType(
-					0L,  // 永不过期
-					true, // 持久化
-					ChunkTicketType.Use.LOADING_AND_SIMULATION
-			)
-	);
+
 	
 	private TntEntityMixin(EntityType<?> type, World world) {
 		super(type, world);
@@ -57,7 +39,7 @@ public abstract class TntEntityMixin extends Entity{
 			if(OptionManager.tntChunkLoading) {
 				ServerWorld world = (ServerWorld)this.getWorld();
 				Vec3d nextPos = this.getPos();
-				ChunkTicketType tt = OptionManager.tntChunkLoadingPermanence ? PERMANENT_ENTITY_TICKET : ENTITY_TICKET;
+				ChunkTicketType tt = OptionManager.tntChunkLoadingPermanence ? MessMod.PERMANENT_TNT_ENTITY_TICKET : MessMod.TNT_ENTITY_TICKET;
 				world.getServer().submitAndJoin(() -> world.getChunkManager().addTicket(tt,
 						new ChunkPos((int)(nextPos.x / 16), (int)(nextPos.z / 16)), OptionManager.tntChunkLoadingRange));
 			}

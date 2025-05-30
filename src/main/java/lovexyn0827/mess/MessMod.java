@@ -1,6 +1,11 @@
 package lovexyn0827.mess;
 
 import java.io.IOException;
+
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.server.world.ChunkTicketType;
+import net.minecraft.util.Identifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
@@ -41,6 +46,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import org.spongepowered.asm.mixin.Unique;
 
 public class MessMod implements ModInitializer {
 	public static final Logger LOGGER = LogManager.getLogger();
@@ -66,6 +72,39 @@ public class MessMod implements ModInitializer {
 	private ChunkLoadingInfoRenderer chunkLoadingInfoRenderer;
 	private ChunkBehaviorLogger chunkLogger;
 	private long gameTime;
+
+	public static final ChunkTicketType PROJECTILE_ENTITY_TICKET = Registry.register(
+			Registries.TICKET_TYPE,
+			Identifier.of("messmod", "projectile"),
+			new ChunkTicketType(3L,false, ChunkTicketType.Use.LOADING_AND_SIMULATION)
+	);
+
+	public static final ChunkTicketType PERMANENT_PROJECTILE_ENTITY_TICKET = Registry.register(
+			Registries.TICKET_TYPE,
+			Identifier.of("messmod", "projectile_permanent"),
+			new ChunkTicketType(0L, true, ChunkTicketType.Use.LOADING_AND_SIMULATION)
+	);
+
+	public static final ChunkTicketType TNT_ENTITY_TICKET = Registry.register(
+			Registries.TICKET_TYPE,
+			Identifier.of("messmod", "tnt"),
+			new ChunkTicketType(
+					3L,  // 3 ticks后过期
+					false, // 不持久化
+					ChunkTicketType.Use.LOADING_AND_SIMULATION
+			)
+	);
+
+	public static final ChunkTicketType PERMANENT_TNT_ENTITY_TICKET = Registry.register(
+			Registries.TICKET_TYPE,
+			Identifier.of("messmod", "tnt_permanent"),
+			new ChunkTicketType(
+					0L,  // 永不过期
+					true, // 持久化
+					ChunkTicketType.Use.LOADING_AND_SIMULATION
+			)
+	);
+
 
 	private MessMod() {
 		this.reloadMapping();

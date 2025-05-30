@@ -1,5 +1,6 @@
 package lovexyn0827.mess.mixins;
 
+import lovexyn0827.mess.MessMod;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
@@ -25,19 +26,7 @@ import net.minecraft.world.World;
 public abstract class ProjectileEntityMixin extends Entity {
 //	private static final ChunkTicketType<? super Entity> ENTITY_TICKET = ChunkTicketType.create("projectile", (a, b) -> 1, 3);
 //	private static final ChunkTicketType<? super Entity> PERMANENT_ENTITY_TICKET = ChunkTicketType.create("projectile_permanent", (a, b) -> 1);
-@Unique
-private static final ChunkTicketType ENTITY_TICKET = Registry.register(
-		Registries.TICKET_TYPE,
-		Identifier.of("messmod", "projectile"),
-		new ChunkTicketType(3L,false, ChunkTicketType.Use.LOADING_AND_SIMULATION)
-	);
 
-	@Unique
-	private static final ChunkTicketType PERMANENT_ENTITY_TICKET = Registry.register(
-			Registries.TICKET_TYPE,
-			Identifier.of("messmod", "projectile_permanent"),
-			new ChunkTicketType(0L, true, ChunkTicketType.Use.LOADING_AND_SIMULATION)
-	);
 	private ProjectileEntityMixin(EntityType<?> type, World world) {
 		super(type, world);
 	}
@@ -49,7 +38,7 @@ private static final ChunkTicketType ENTITY_TICKET = Registry.register(
 			if(OptionManager.projectileChunkLoading && !((Object)this instanceof FireworkRocketEntity)) {
 				ServerWorld world = (ServerWorld)this.getWorld();
 				Vec3d nextPos = this.getPos().add(this.getVelocity());
-				ChunkTicketType tt = OptionManager.projectileChunkLoadingPermanence ? PERMANENT_ENTITY_TICKET : ENTITY_TICKET;
+				ChunkTicketType tt = OptionManager.projectileChunkLoadingPermanence ? MessMod.PERMANENT_PROJECTILE_ENTITY_TICKET : MessMod.PROJECTILE_ENTITY_TICKET;
 				world.getServer().submitAndJoin(() ->
 					world.getChunkManager().addTicket(tt, new ChunkPos((int)(nextPos.x / 16),
 							(int)(nextPos.z / 16)), OptionManager.projectileChunkLoadingRange));
