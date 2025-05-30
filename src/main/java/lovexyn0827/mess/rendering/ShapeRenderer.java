@@ -49,7 +49,6 @@ import java.util.OptionalInt;
 import java.util.Set;
 
 import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 
 /**
  * A modified version of carpet.script.util.ShapesRenderer
@@ -58,16 +57,16 @@ import org.joml.Matrix4fStack;
 public class ShapeRenderer {
     //private final Map<RegistryKey<World>, Map<ShapeSpace, Set<Shape>>> shapes;
 	private final ShapeCache shapes;
-	private MinecraftClient client;
+	private final MinecraftClient client;
     private static RenderPipeline SHAPE_LINES_PIPELINE;
     private static RenderPipeline SHAPE_FACES_PIPELINE;
-    private static RenderPipeline SHAPE_FACES_OVERLAY_PIPELINE; // 可选
     private static boolean pipelinesInitialized = false;
-    private static float currentLineWidth = 1.0f; // 可以添加一个字段来控制当前线宽
+    private static final float currentLineWidth = 1.0f; // 可以添加一个字段来控制当前线宽
 
     public ShapeRenderer(MinecraftClient mc) {
         this.shapes = ShapeCache.create(mc);
         this.client = mc;
+        InitializePipelines();
     }
 
     public void close() {
@@ -78,7 +77,7 @@ public class ShapeRenderer {
 		return this.shapes;
 	}
 
-    private static synchronized void ensurePipelinesInitialized() {
+    private static synchronized void InitializePipelines() {
         if (pipelinesInitialized) {
             return;
         }
@@ -131,28 +130,10 @@ public class ShapeRenderer {
                 // position_color shader 通常不处理 Fog
                 .build();
 
-        // --- Faces Pipeline (Overlay Blend) ---
-        SHAPE_FACES_OVERLAY_PIPELINE = RenderPipeline.builder()
-                .withLocation(Identifier.of("messmod", "shape_faces_overlay_pipeline"))
-                .withVertexShader(positionColorVert)
-                .withFragmentShader(positionColorFrag)
-                .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
-                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                .withCull(false)
-                .withBlend(BlendFunction.OVERLAY) // 特殊混合模式
-                .withDepthWrite(false)
-                .withColorWrite(true, true)
-                .withUniform("ModelViewMat", UniformType.MATRIX4X4)
-                .withUniform("ProjMat", UniformType.MATRIX4X4)
-                .withUniform("ColorModulator", UniformType.VEC4)
-                .build();
-
         pipelinesInitialized = true;
     }
 
     public void render(MatrixStack matrices, Camera camera, float partialTick) { // matrices 是从 Mixin 传来的
-        ensurePipelinesInitialized();
-
         ClientWorld currentWorld = this.client.world;
         if (currentWorld == null) { return; }
 

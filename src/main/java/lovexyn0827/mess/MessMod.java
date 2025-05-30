@@ -46,7 +46,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
-import org.spongepowered.asm.mixin.Unique;
 
 public class MessMod implements ModInitializer {
 	public static final Logger LOGGER = LogManager.getLogger();

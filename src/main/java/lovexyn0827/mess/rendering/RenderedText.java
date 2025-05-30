@@ -21,8 +21,8 @@ import net.minecraft.world.World;
 
 public class RenderedText extends Shape {
 
-	private String value;
-	private Vec3d pos;
+	private final String value;
+	private final Vec3d pos;
 
 	public RenderedText(String value, Vec3d pos, int color, int life, long gt) {
 		// 背景色 (fill) 0x0000002f 意味着非常暗淡的近乎透明的黑色背景

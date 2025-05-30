@@ -23,9 +23,9 @@ public abstract class Shape {
 	protected float fg;
 	protected float fb;
 	protected float fa;
-	private long createdTime;
+	private final long createdTime;
 	double renderEpsilon = 0;
-	private int fill;
+	private final int fill;
 
 	protected Shape(int color, int fill, int life, long gt) {
 		this.color = color;

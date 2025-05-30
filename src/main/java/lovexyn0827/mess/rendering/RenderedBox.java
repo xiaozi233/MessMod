@@ -14,7 +14,7 @@ import net.minecraft.world.World;
 
 public class RenderedBox extends Shape {
 
-	private Box box;
+	private final Box box;
 
 	public RenderedBox(Box box, int lineColor, int fillColor, int life, long gt) {
 		super(lineColor, fillColor, life, gt);

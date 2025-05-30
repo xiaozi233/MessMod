@@ -1,11 +1,7 @@
 package lovexyn0827.mess.mixins;
 
 import lovexyn0827.mess.MessMod;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.At;
@@ -31,7 +27,8 @@ public abstract class ProjectileEntityMixin extends Entity {
 		super(type, world);
 	}
 
-	@Inject(method = "tick", at = @At("TAIL"))
+	@SuppressWarnings("ConstantValue")
+    @Inject(method = "tick", at = @At("TAIL"))
 	private void loadChunkIfNeeded(CallbackInfo ci) {
 		if(!this.getWorld().isClient) {
 			// Firework rockets are not supported because their movements are hard to predict.

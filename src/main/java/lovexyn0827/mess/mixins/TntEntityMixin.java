@@ -1,11 +1,7 @@
 package lovexyn0827.mess.mixins;
 
 import lovexyn0827.mess.MessMod;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -30,7 +26,6 @@ public abstract class TntEntityMixin extends Entity{
 		super(type, world);
 	}
 
-	@SuppressWarnings("resource")
 	@Inject(method = "tick",
 			at = @At("TAIL")
 			)
