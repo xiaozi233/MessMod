@@ -34,8 +34,9 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gl.UniformType;
 import net.minecraft.client.render.*;
+import net.minecraft.client.util.Window;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.client.util.math.MatrixStack;
@@ -61,13 +62,14 @@ public class ShapeRenderer {
     private static RenderPipeline SHAPE_LINES_PIPELINE;
     private static RenderPipeline SHAPE_FACES_PIPELINE;
     private static RenderPipeline SHAPE_FACES_OVERLAY_PIPELINE; // 可选
-	
+    private static boolean pipelinesInitialized = false;
+    private static float currentLineWidth = 1.0f; // 可以添加一个字段来控制当前线宽
+
     public ShapeRenderer(MinecraftClient mc) {
         this.shapes = ShapeCache.create(mc);
-		this.client = mc;
-        initializePipelines();
+        this.client = mc;
     }
-    
+
     public void close() {
     	this.shapes.close();
     }
@@ -76,56 +78,81 @@ public class ShapeRenderer {
 		return this.shapes;
 	}
 
-    private static synchronized void initializePipelines() {
-        Identifier posColorNormalVert = Identifier.of("minecraft", "core/position_color_normal");
-        Identifier posColorVert = Identifier.of("minecraft", "core/position_color");
-        Identifier posColorFrag = Identifier.of("minecraft", "core/position_color");
-
-        if (SHAPE_LINES_PIPELINE == null) {
-            SHAPE_LINES_PIPELINE = RenderPipeline.builder()
-                    .withLocation(Identifier.of("messmod", "shape_lines_pipeline"))
-                    .withVertexShader(posColorNormalVert)
-                    .withFragmentShader(posColorFrag)
-                    .withVertexFormat(VertexFormats.POSITION_COLOR_NORMAL, VertexFormat.DrawMode.LINES)
-                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                    .withCull(false)
-                    .withBlend(BlendFunction.TRANSLUCENT)
-                    .withDepthWrite(false)
-                    .withColorWrite(true, true)
-                    .build();
+    private static synchronized void ensurePipelinesInitialized() {
+        if (pipelinesInitialized) {
+            return;
         }
+        // 确保在渲染线程执行
+        RenderSystem.assertOnRenderThread();
 
-        if (SHAPE_FACES_PIPELINE == null) {
-            SHAPE_FACES_PIPELINE = RenderPipeline.builder()
-                    .withLocation(Identifier.of("messmod", "shape_faces_pipeline"))
-                    .withVertexShader(posColorVert)
-                    .withFragmentShader(posColorFrag)
-                    .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
-                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                    .withCull(false)
-                    .withBlend(BlendFunction.TRANSLUCENT)
-                    .withDepthWrite(false)
-                    .withColorWrite(true, true)
-                    .build();
-        }
+        Identifier linesVert = Identifier.of("minecraft", "core/rendertype_lines");
+        Identifier linesFrag = Identifier.of("minecraft", "core/rendertype_lines");
+        Identifier positionColorVert = Identifier.of("minecraft", "core/position_color");
+        Identifier positionColorFrag = Identifier.of("minecraft", "core/position_color");
 
-        if (SHAPE_FACES_OVERLAY_PIPELINE == null) {
-            SHAPE_FACES_OVERLAY_PIPELINE = RenderPipeline.builder()
-                    .withLocation(Identifier.of("messmod", "shape_faces_overlay_pipeline"))
-                    .withVertexShader(posColorVert)
-                    .withFragmentShader(posColorFrag)
-                    .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
-                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-                    .withCull(false)
-                    .withBlend(BlendFunction.OVERLAY)
-                    .withDepthWrite(false)
-                    .withColorWrite(true, true)
-                    .build();
-        }
+        // --- Lines Pipeline ---
+        SHAPE_LINES_PIPELINE = RenderPipeline.builder()
+                .withLocation(Identifier.of("messmod", "shape_lines_pipeline"))
+                .withVertexShader(linesVert)
+                .withFragmentShader(linesFrag)
+                .withVertexFormat(VertexFormats.POSITION_COLOR_NORMAL, VertexFormat.DrawMode.DEBUG_LINES)
+                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                .withCull(false)
+                .withBlend(BlendFunction.TRANSLUCENT)
+                .withDepthWrite(false) // 线条通常不写入深度
+                .withColorWrite(true, true)
+                // 标准 Uniforms (会被 RenderSystem/RenderPass 自动填充)
+                .withUniform("ModelViewMat", UniformType.MATRIX4X4)
+                .withUniform("ProjMat", UniformType.MATRIX4X4)
+                .withUniform("ColorModulator", UniformType.VEC4)
+                .withUniform("FogStart", UniformType.FLOAT)
+                .withUniform("FogEnd", UniformType.FLOAT)
+                .withUniform("FogColor", UniformType.VEC4)
+                .withUniform("FogShape", UniformType.INT)
+                // 特定于 lines 的 Uniforms
+                .withUniform("LineWidth", UniformType.FLOAT)
+                .withUniform("ScreenSize", UniformType.VEC2)
+                .build();
+
+        // --- Faces Pipeline (Standard Blend) ---
+        SHAPE_FACES_PIPELINE = RenderPipeline.builder()
+                .withLocation(Identifier.of("messmod", "shape_faces_pipeline"))
+                .withVertexShader(positionColorVert)
+                .withFragmentShader(positionColorFrag)
+                .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
+                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                .withCull(false)
+                .withBlend(BlendFunction.TRANSLUCENT)
+                .withDepthWrite(false) // 透明面通常不写入深度
+                .withColorWrite(true, true)
+                .withUniform("ModelViewMat", UniformType.MATRIX4X4)
+                .withUniform("ProjMat", UniformType.MATRIX4X4)
+                .withUniform("ColorModulator", UniformType.VEC4)
+                // position_color shader 通常不处理 Fog
+                .build();
+
+        // --- Faces Pipeline (Overlay Blend) ---
+        SHAPE_FACES_OVERLAY_PIPELINE = RenderPipeline.builder()
+                .withLocation(Identifier.of("messmod", "shape_faces_overlay_pipeline"))
+                .withVertexShader(positionColorVert)
+                .withFragmentShader(positionColorFrag)
+                .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
+                .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                .withCull(false)
+                .withBlend(BlendFunction.OVERLAY) // 特殊混合模式
+                .withDepthWrite(false)
+                .withColorWrite(true, true)
+                .withUniform("ModelViewMat", UniformType.MATRIX4X4)
+                .withUniform("ProjMat", UniformType.MATRIX4X4)
+                .withUniform("ColorModulator", UniformType.VEC4)
+                .build();
+
+        pipelinesInitialized = true;
     }
 
+    public void render(MatrixStack matrices, Camera camera, float partialTick) { // matrices 是从 Mixin 传来的
+        ensurePipelinesInitialized();
 
-    public void render(MatrixStack matrices, Camera camera, float partialTick) {
         ClientWorld currentWorld = this.client.world;
         if (currentWorld == null) { return; }
 
@@ -137,10 +164,14 @@ public class ShapeRenderer {
         double cameraX = camera.getPos().x;
         double cameraY = camera.getPos().y;
         double cameraZ = camera.getPos().z;
-        Matrix4f poseMatrix = matrices.peek().getPositionMatrix();
+
+        // 投影矩阵从 RenderSystem 全局获取，由 GameRenderer 设置
+        Matrix4f projectionMatrixForShader = RenderSystem.getProjectionMatrix();
 
         Framebuffer mainFramebuffer = MinecraftClient.getInstance().getFramebuffer();
         if (mainFramebuffer == null) return;
+
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         synchronized (shapes) {
             this.shapes.getAllShapes().values().forEach((map) -> {
@@ -149,24 +180,27 @@ public class ShapeRenderer {
                 });
             });
 
-            // --- Render Faces ---
+            // --- 渲染面 ---
             BufferBuilder facesBufferBuilder = tessellator.begin(SHAPE_FACES_PIPELINE.getVertexFormatMode(), SHAPE_FACES_PIPELINE.getVertexFormat());
             for (Map.Entry<ShapeSpace, Set<Shape>> dimEntry : shapesInDim.entrySet()) {
                 for (Shape s : dimEntry.getValue()) {
                     if (s.shouldRender(dimensionType) && !(s instanceof RenderedText)) {
-                        s.renderFacesToBuffer(poseMatrix, facesBufferBuilder, cameraX, cameraY, cameraZ, partialTick);
+                        // Shape.renderFacesToBuffer 现在不接收 matrix 参数
+                        s.renderFacesToBuffer(facesBufferBuilder, cameraX, cameraY, cameraZ, partialTick);
                     }
                 }
             }
             BuiltBuffer facesBuiltBuffer = facesBufferBuilder.endNullable();
             if (facesBuiltBuffer != null && facesBuiltBuffer.getDrawParameters().indexCount() > 0) {
+                RenderPipeline currentFacePipeline = SHAPE_FACES_PIPELINE;
                 try (GpuBuffer faceVertexBuffer = RenderSystem.getDevice().createBuffer(
                         () -> "messmod_shape_faces_vb", BufferType.VERTICES, BufferUsage.STREAM_WRITE, facesBuiltBuffer.getBuffer())) {
                     RenderSystem.ShapeIndexBuffer sequentialQuads = RenderSystem.getSequentialBuffer(VertexFormat.DrawMode.QUADS);
                     GpuBuffer faceIndexBuffer = sequentialQuads.getIndexBuffer(facesBuiltBuffer.getDrawParameters().indexCount());
-                    try (com.mojang.blaze3d.systems.RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder()
+                    try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder()
                             .createRenderPass(mainFramebuffer.getColorAttachment(), OptionalInt.empty(), mainFramebuffer.getDepthAttachment(), OptionalDouble.empty())) {
-                        renderPass.setPipeline(SHAPE_FACES_PIPELINE);
+                        renderPass.setPipeline(currentFacePipeline);
+//                        renderPass.setUniform("ProjMat", projectionMatrixForShader);   // <--- 手动设置
                         renderPass.setVertexBuffer(0, faceVertexBuffer);
                         renderPass.setIndexBuffer(faceIndexBuffer, sequentialQuads.getIndexType());
                         renderPass.drawIndexed(0, facesBuiltBuffer.getDrawParameters().indexCount());
@@ -175,12 +209,13 @@ public class ShapeRenderer {
                 facesBuiltBuffer.close();
             }
 
-            // --- Render Lines ---
+            // --- 渲染线 ---
             BufferBuilder linesBufferBuilder = tessellator.begin(SHAPE_LINES_PIPELINE.getVertexFormatMode(), SHAPE_LINES_PIPELINE.getVertexFormat());
             for (Map.Entry<ShapeSpace, Set<Shape>> dimEntry : shapesInDim.entrySet()) {
                 for (Shape s : dimEntry.getValue()) {
-                    if (s.shouldRender(dimensionType) && !(s instanceof RenderedText)) { // Exclude RenderedText from general line drawing
-                        s.renderLinesToBuffer(poseMatrix, linesBufferBuilder, cameraX, cameraY, cameraZ, partialTick);
+                    if (s.shouldRender(dimensionType) && !(s instanceof RenderedText)) {
+                        // Shape.renderLinesToBuffer 现在不接收 matrix 参数
+                        s.renderLinesToBuffer(linesBufferBuilder, cameraX, cameraY, cameraZ, partialTick);
                     }
                 }
             }
@@ -188,9 +223,13 @@ public class ShapeRenderer {
             if (linesBuiltBuffer != null && linesBuiltBuffer.getDrawParameters().vertexCount() > 0) {
                 try (GpuBuffer lineVertexBuffer = RenderSystem.getDevice().createBuffer(
                         () -> "messmod_shape_lines_vb", BufferType.VERTICES, BufferUsage.STREAM_WRITE, linesBuiltBuffer.getBuffer())) {
-                    try (com.mojang.blaze3d.systems.RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder()
+                    try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder()
                             .createRenderPass(mainFramebuffer.getColorAttachment(), OptionalInt.empty(), mainFramebuffer.getDepthAttachment(), OptionalDouble.empty())) {
                         renderPass.setPipeline(SHAPE_LINES_PIPELINE);
+//                        renderPass.setUniform("ProjMat", projectionMatrixForShader);   // <--- 手动设置
+                        renderPass.setUniform("LineWidth", currentLineWidth);
+                        Window window = client.getWindow();
+                        renderPass.setUniform("ScreenSize", (float) window.getFramebufferWidth(), (float) window.getFramebufferHeight());
                         renderPass.setVertexBuffer(0, lineVertexBuffer);
                         renderPass.draw(0, linesBuiltBuffer.getDrawParameters().vertexCount());
                     }
@@ -199,36 +238,34 @@ public class ShapeRenderer {
             }
         } // End synchronized(shapes)
 
-        // --- Render Text (separately, after geometry, using its own system) ---
-        // Text rendering should ideally happen after all GpuBuffer-based geometry
-        // to ensure VCP flushes correctly and states don't interfere too much.
+        // --- 文本渲染 ---
         VertexConsumerProvider.Immediate immediateText = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
-        // We need a fresh MatrixStack for text, inheriting the view transform
         MatrixStack textMatricesGlobal = new MatrixStack();
-        textMatricesGlobal.multiplyPositionMatrix(matrices.peek().getPositionMatrix()); // Inherit view from overall matrices
+        // 文本的 MatrixStack 从我们正确的视图矩阵开始
 
-        synchronized(shapes) { // Synchronize again if shapesInDim could change, or use a copy
+        synchronized(shapes) {
             for (Map.Entry<ShapeSpace, Set<Shape>> dimEntry : shapesInDim.entrySet()) {
                 for (Shape s : dimEntry.getValue()) {
                     if (s.shouldRender(dimensionType) && s instanceof RenderedText renderedTextInstance) {
-                        // Pass the global text matrix stack, camera, and VCP
-                        renderedTextInstance.renderActualText(textMatricesGlobal, immediateText, camera, partialTick);
+                        MatrixStack individualTextMatrices = new MatrixStack();
+                        individualTextMatrices.multiplyPositionMatrix(textMatricesGlobal.peek().getPositionMatrix());
+                        renderedTextInstance.renderActualText(individualTextMatrices, immediateText, camera, partialTick);
                     }
                 }
             }
         }
-        immediateText.draw(); // Draw all batched text
+        immediateText.draw();
     }
     
     // some raw shit
 
-    public static void buildLine(Matrix4f modelViewMatrix, BufferBuilder builder,
+    public static void buildLine(BufferBuilder builder,
                                  float x1, float y1, float z1,
                                  float x2, float y2, float z2,
                                  float r, float g, float b, float a,
                                  float normalX, float normalY, float normalZ) {
-        builder.vertex(modelViewMatrix, x1, y1, z1).color(r, g, b, a).normal(normalX, normalY, normalZ); // 第一个顶点结束
-        builder.vertex(modelViewMatrix, x2, y2, z2).color(r, g, b, a).normal(normalX, normalY, normalZ); // 第二个顶点结束
+        builder.vertex(x1, y1, z1).color(r, g, b, a).normal(normalX, normalY, normalZ); // 第一个顶点结束
+        builder.vertex(x2, y2, z2).color(r, g, b, a).normal(normalX, normalY, normalZ); // 第二个顶点结束
         // 当下一个 builder.vertex() 被调用，或者 builder.end() 被调用时，这些顶点会被最终确定
     }
 
@@ -236,7 +273,7 @@ public class ShapeRenderer {
      * Builds a wireframe box into the BufferBuilder.
      * Assumes BufferBuilder has been started with LINES mode and POSITION_COLOR_NORMAL format.
      */
-    public static void buildBoxWireframe(Matrix4f modelViewMatrix, BufferBuilder builder,
+    public static void buildBoxWireframe(BufferBuilder builder,
                                          float x1, float y1, float z1,
                                          float x2, float y2, float z2,
                                          boolean xthick, boolean ythick, boolean zthick,
@@ -245,43 +282,45 @@ public class ShapeRenderer {
         float nx = 0f, ny = 1f, nz = 0f; // Default normal
 
         if (xthick) {
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z1).color(r1, g2, b2, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z1).color(r1, g2, b2, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
         }
+
         if (ythick) {
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z1).color(r2, g1, b2, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z1).color(r2, g1, b2, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
         }
+
         if (zthick) {
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z1).color(r2, g2, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y1, z2).color(r2, g2, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y1, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
 
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z1).color(r1, g1, b1, a).normal(nx, ny, nz);
+            builder.vertex(x2, y2, z2).color(r1, g1, b1, a).normal(nx, ny, nz);
         }
     }
 
@@ -289,47 +328,47 @@ public class ShapeRenderer {
      * Builds a solid box (faces) into the BufferBuilder.
      * Assumes BufferBuilder has been started with QUADS mode and POSITION_COLOR format.
      */
-    public static void buildBoxFaces(Matrix4f modelViewMatrix, BufferBuilder builder,
+    public static void buildBoxFaces(BufferBuilder builder,
                                      float x1, float y1, float z1,
                                      float x2, float y2, float z2,
                                      boolean xthick, boolean ythick, boolean zthick,
                                      float r, float g, float b, float a) {
         // For POSITION_COLOR format, we don't call .normal()
         if (xthick && ythick) { // Front Face
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r, g, b, a);
+            builder.vertex(x1, y1, z1).color(r, g, b, a);
+            builder.vertex(x1, y2, z1).color(r, g, b, a);
+            builder.vertex(x2, y2, z1).color(r, g, b, a);
+            builder.vertex(x2, y1, z1).color(r, g, b, a);
         }
         if (xthick && ythick) { // Back Face
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r, g, b, a);
+            builder.vertex(x2, y1, z2).color(r, g, b, a);
+            builder.vertex(x2, y2, z2).color(r, g, b, a);
+            builder.vertex(x1, y2, z2).color(r, g, b, a);
+            builder.vertex(x1, y1, z2).color(r, g, b, a);
         }
         if (xthick && zthick) { // Top Face
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r, g, b, a);
+            builder.vertex(x1, y2, z2).color(r, g, b, a);
+            builder.vertex(x2, y2, z2).color(r, g, b, a);
+            builder.vertex(x2, y2, z1).color(r, g, b, a);
+            builder.vertex(x1, y2, z1).color(r, g, b, a);
         }
         if (xthick && zthick) { // Bottom Face
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r, g, b, a);
+            builder.vertex(x1, y1, z1).color(r, g, b, a);
+            builder.vertex(x2, y1, z1).color(r, g, b, a);
+            builder.vertex(x2, y1, z2).color(r, g, b, a);
+            builder.vertex(x1, y1, z2).color(r, g, b, a);
         }
         if (ythick && zthick) { // Left Face
-            builder.vertex(modelViewMatrix, x1, y1, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y2, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x1, y1, z1).color(r, g, b, a);
+            builder.vertex(x1, y1, z2).color(r, g, b, a);
+            builder.vertex(x1, y2, z2).color(r, g, b, a);
+            builder.vertex(x1, y2, z1).color(r, g, b, a);
+            builder.vertex(x1, y1, z1).color(r, g, b, a);
         }
         if (ythick && zthick) { // Right Face
-            builder.vertex(modelViewMatrix, x2, y1, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z1).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y2, z2).color(r, g, b, a);
-            builder.vertex(modelViewMatrix, x2, y1, z2).color(r, g, b, a);
+            builder.vertex(x2, y1, z1).color(r, g, b, a);
+            builder.vertex(x2, y2, z1).color(r, g, b, a);
+            builder.vertex(x2, y2, z2).color(r, g, b, a);
+            builder.vertex(x2, y1, z2).color(r, g, b, a);
         }
     }
 }

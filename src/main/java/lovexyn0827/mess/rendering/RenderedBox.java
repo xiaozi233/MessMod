@@ -7,7 +7,6 @@ import net.fabricmc.api.Environment;
 // import net.minecraft.client.render.Tessellator; // 不再需要
 // import net.minecraft.client.util.math.MatrixStack; // 不再需要，用 Matrix4f
 import net.minecraft.client.render.BufferBuilder;
-import org.joml.Matrix4f; // 新增
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.Box;
@@ -26,20 +25,19 @@ public class RenderedBox extends Shape {
 					   int lineColor, int fillColor, int life, long gt) {
 		super(lineColor, fillColor, life, gt);
 		// 确保 min <= max
-		this.box = new Box(Math.min(minX, maxX), Math.min(minY, maxY), Math.min(minZ, maxZ),
-				Math.max(minX, maxX), Math.max(minY, maxY), Math.max(minZ, maxZ));
+		this.box = new Box(minX, minY, minZ, maxX, maxY, maxZ);
 	}
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	protected void renderFacesToBuffer(Matrix4f matrix, net.minecraft.client.render.BufferBuilder builder, double cameraX,
+	protected void renderFacesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		if (this.fa <= 0.001f) return; // 如果填充色完全透明，则不绘制面
 
 		// 使用 ShapeRendererUtils (或内联逻辑) 构建面
 		// 注意：ShapeRendererUtils.buildBoxFaces 的 xthick,ythick,zthick 参数现在用于条件性绘制面
 		// 如果总是想画所有面，都传true
-		ShapeRenderer.buildBoxFaces(matrix, builder,
+		ShapeRenderer.buildBoxFaces(builder,
 				(float) (box.minX - renderEpsilon), (float) (box.minY - renderEpsilon), (float) (box.minZ - renderEpsilon),
 				(float) (box.maxX + renderEpsilon), (float) (box.maxY + renderEpsilon), (float) (box.maxZ + renderEpsilon),
 				true, true, true, // xthick, ythick, zthick -> true to draw all faces
@@ -49,16 +47,16 @@ public class RenderedBox extends Shape {
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	protected void renderLinesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected void renderLinesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		if (this.a <= 0.001f) return; // 如果线条颜色完全透明，则不绘制
 
 		// 使用 ShapeRendererUtils (或内联逻辑) 构建线框
 		// ShapeRendererUtils.buildBoxWireframe 的 xthick,ythick,zthick 参数现在用于条件性绘制边
 		// 第二组颜色参数 (r2,g2,b2) 在简化版中被忽略
-		ShapeRenderer.buildBoxWireframe(matrix, builder,
-				(float) (box.minX - renderEpsilon), (float) (box.minY - renderEpsilon), (float) (box.minZ - renderEpsilon),
-				(float) (box.maxX + renderEpsilon), (float) (box.maxY + renderEpsilon), (float) (box.maxZ + renderEpsilon),
+		ShapeRenderer.buildBoxWireframe(builder,
+				(float) (box.minX - cameraX - renderEpsilon), (float) (box.minY - cameraY - renderEpsilon), (float) (box.minZ - cameraZ - renderEpsilon),
+				(float) (box.maxX - cameraX + renderEpsilon), (float) (box.maxY - cameraY + renderEpsilon), (float) (box.maxZ - cameraZ + renderEpsilon),
 				true, true, true, // xthick, ythick, zthick -> true to draw all edges
 				this.r, this.g, this.b, this.a,  // 线条颜色
 				0, 0, 0  // r2, g2, b2 (在简化版中未使用)

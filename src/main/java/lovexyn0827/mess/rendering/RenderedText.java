@@ -2,7 +2,6 @@
 package lovexyn0827.mess.rendering;
 
 import net.minecraft.client.render.BufferBuilder;
-import org.joml.Matrix4f; // 用于 renderActualText
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -17,7 +16,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtString; // 确保这个 import
 import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.math.RotationAxis; // 用于旋转
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -34,13 +32,13 @@ public class RenderedText extends Shape {
 	}
 
 	@Override
-	protected void renderFacesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected void renderFacesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		// 文本没有“面”通过这种方式渲染
 	}
 
 	@Override
-	protected void renderLinesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected void renderLinesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		// 文本也不是通过画“线”来渲染的
 		// 如果需要文本的边界框，可以在这里画，但实际文本渲染不在这里
@@ -76,7 +74,7 @@ public class RenderedText extends Shape {
 
 
 		matrixStack.push();
-		matrixStack.translate(pos.x, pos.y, pos.z);
+		matrixStack.translate(pos.x - camera.getPos().x, pos.y - camera.getPos().y, pos.z - camera.getPos().z);
 		matrixStack.multiply(camera.getRotation());
 		float scale = 0.020f; // Adjusted scale, was 0.025f
 		matrixStack.scale(scale, -scale, scale);

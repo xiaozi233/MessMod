@@ -6,13 +6,10 @@ import com.google.common.collect.HashBiMap;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import org.joml.Matrix4f;
 
 public abstract class Shape {
 	protected static final BiMap<String, Class<? extends Shape>> IDS = HashBiMap.create();
@@ -46,10 +43,10 @@ public abstract class Shape {
 	}
 
 	@Environment(EnvType.CLIENT)
-	protected abstract void renderFacesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected abstract void renderFacesToBuffer(BufferBuilder builder, double cameraX,
 												double cameraY, double cameraZ, float partialTick);
 	@Environment(EnvType.CLIENT)
-	protected abstract void renderLinesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected abstract void renderLinesToBuffer(BufferBuilder builder, double cameraX,
 												double cameraY, double cameraZ, float partialTick);
 
 

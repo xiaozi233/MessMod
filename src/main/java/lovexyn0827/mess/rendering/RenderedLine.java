@@ -7,7 +7,6 @@ import net.fabricmc.api.Environment;
 // import net.minecraft.client.render.Tessellator; // 不再需要
 // import net.minecraft.client.util.math.MatrixStack; // 不再需要，用 Matrix4f
 import net.minecraft.client.render.BufferBuilder;
-import org.joml.Matrix4f; // 新增
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.Vec3d;
@@ -26,14 +25,14 @@ public class RenderedLine extends Shape {
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	protected void renderFacesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected void renderFacesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		// Lines do not have faces, so this method is empty.
 	}
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	protected void renderLinesToBuffer(Matrix4f matrix, BufferBuilder builder, double cameraX,
+	protected void renderLinesToBuffer(BufferBuilder builder, double cameraX,
 									   double cameraY, double cameraZ, float partialTick) {
 		if (this.a <= 0.001f) return; // 如果线条颜色完全透明，则不绘制
 
@@ -49,9 +48,9 @@ public class RenderedLine extends Shape {
 		// 如果 renderEpsilon 是为了避免Z-fighting，将其加到所有坐标上可能不总是正确。
 		// 这里暂时保持原样，但其效果可能与旧版不同，因为矩阵变换的方式变了。
 		// 一个更稳妥的做法可能是在构建RenderPipeline时使用depthBias。
-		ShapeRenderer.buildLine(matrix, builder,
-				(float) (from.x - renderEpsilon), (float) (from.y - renderEpsilon), (float) (from.z - renderEpsilon),
-				(float) (to.x + renderEpsilon),   (float) (to.y + renderEpsilon),   (float) (to.z + renderEpsilon), // 通常epsilon应该一致地应用
+		ShapeRenderer.buildLine(builder,
+				(float) (from.x - cameraX - renderEpsilon), (float) (from.y - cameraY - renderEpsilon), (float) (from.z - cameraZ - renderEpsilon),
+				(float) (to.x - cameraX + renderEpsilon),   (float) (to.y - cameraY + renderEpsilon),   (float) (to.z - cameraZ + renderEpsilon), // 通常epsilon应该一致地应用
 				this.r, this.g, this.b, this.a,
 				0, 1, 0 // 示例法线，对于无光照线不重要
 		);
