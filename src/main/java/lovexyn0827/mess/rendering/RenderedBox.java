@@ -24,7 +24,6 @@ public class RenderedBox extends Shape {
 	public RenderedBox(double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
 					   int lineColor, int fillColor, int life, long gt) {
 		super(lineColor, fillColor, life, gt);
-		// 确保 min <= max
 		this.box = new Box(minX, minY, minZ, maxX, maxY, maxZ);
 	}
 
@@ -38,8 +37,8 @@ public class RenderedBox extends Shape {
 		// 注意：ShapeRendererUtils.buildBoxFaces 的 xthick,ythick,zthick 参数现在用于条件性绘制面
 		// 如果总是想画所有面，都传true
 		ShapeRenderer.buildBoxFaces(builder,
-				(float) (box.minX - renderEpsilon), (float) (box.minY - renderEpsilon), (float) (box.minZ - renderEpsilon),
-				(float) (box.maxX + renderEpsilon), (float) (box.maxY + renderEpsilon), (float) (box.maxZ + renderEpsilon),
+				(float) (box.minX - cameraX - renderEpsilon), (float) (box.minY - cameraY - renderEpsilon), (float) (box.minZ - cameraZ - renderEpsilon),
+				(float) (box.maxX - cameraX + renderEpsilon), (float) (box.maxY - cameraY + renderEpsilon), (float) (box.maxZ - cameraZ + renderEpsilon),
 				true, true, true, // xthick, ythick, zthick -> true to draw all faces
 				this.fr, this.fg, this.fb, this.fa // 填充色
 		);
