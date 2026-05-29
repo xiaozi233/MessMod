@@ -23,7 +23,11 @@ public class I18N {
 	private static Language currentLanguage;
 	
 	public static String translate(String translationKey) {
-		return currentLanguage.translate(translationKey);
+		if (currentLanguage.containsKey(translationKey)) {
+			return currentLanguage.translate(translationKey);
+		} else {
+			return EN_US.translate(translationKey);
+		}
 	}
 
 	public static String translate(String translationKey, Object ... args) {
@@ -79,6 +83,10 @@ public class I18N {
 				return false;
 			}
 		} catch (Exception e) {
+			if (currentLanguage == null) {
+				currentLanguage = EN_US;
+			}
+			
 			e.printStackTrace();
 			return false;
 		}
